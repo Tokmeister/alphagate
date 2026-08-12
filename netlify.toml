@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "netlify/functions"
+
 [[redirects]]
   from = "/"
   to = "/ui/index.html"
