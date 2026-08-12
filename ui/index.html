@@ -28,6 +28,8 @@
         <button id="refreshNow" type="button">Refresh Now</button>
         <button id="openPaperDemo" type="button">Open Paper Demo</button>
         <button id="evaluatePositions" type="button">Evaluate Positions</button>
+        <button id="injectTvSignal" type="button">Inject TV Demo Signal</button>
+        <button id="injectDuplicateSignal" type="button">Inject Duplicate</button>
         <button id="clearEmergency" type="button">Clear Emergency</button>
         <button id="emergencyStop" class="danger-button" type="button">Emergency Stop</button>
       </section>
@@ -41,8 +43,14 @@
 
       <section class="grid main-grid">
         <article class="panel chart-panel">
-          <div class="panel-heading"><h2>TradingView Panel</h2><span class="pill muted">Placeholder</span></div>
+          <div class="panel-heading"><h2>TradingView Panel</h2><span id="tvStatus" class="pill muted">Not connected</span></div>
           <div class="chart-placeholder">TradingView chart embed will mount here after provider configuration.</div>
+          <dl class="metrics signal-metrics">
+            <div><dt>Latest Signal</dt><dd id="tvLatestSignal">—</dd></div>
+            <div><dt>Signal State</dt><dd id="tvSignalState">—</dd></div>
+            <div><dt>Rejection Reason</dt><dd id="tvRejectReason">—</dd></div>
+            <div><dt>Decision Gate</dt><dd id="decisionState">—</dd></div>
+          </dl>
         </article>
 
         <article class="panel">
