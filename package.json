@@ -1,12 +1,12 @@
 {
   "name": "alphagate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "AlphaGate autonomous trading intelligence and paper-trading scaffold.",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check src/market-data.js && node --check src/scanner-runtime.js && node --check src/paper-gate.js && node --check src/vwap-rvol.js && node --check src/paper-position.js && node --check ui/app.js"
+    "check": "node --check src/market-data.js && node --check src/scanner-runtime.js && node --check src/paper-gate.js && node --check src/vwap-rvol.js && node --check src/paper-position.js && node --check src/tradingview-signal.js && node --check src/decision-gate.js && node --check ui/app.js"
   },
   "engines": {
     "node": ">=20"
