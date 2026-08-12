@@ -12,6 +12,9 @@ import { evaluatePaperPosition, openPaperPosition } from '../src/paper-position.
 import { ingestTradingViewSignal } from '../src/tradingview-signal.js';
 import { evaluateDecisionGate } from '../src/decision-gate.js';
 
+const TRADINGVIEW_LATEST_ENDPOINT = '/.netlify/functions/tradingview-latest';
+const POLL_INTERVAL_MS = 5_000;
+
 const elements = {
   startScanner: document.querySelector('#startScanner'),
   stopScanner: document.querySelector('#stopScanner'),
@@ -20,6 +23,7 @@ const elements = {
   evaluatePositions: document.querySelector('#evaluatePositions'),
   injectTvSignal: document.querySelector('#injectTvSignal'),
   injectDuplicateSignal: document.querySelector('#injectDuplicateSignal'),
+  pollLatestSignal: document.querySelector('#pollLatestSignal'),
   emergencyStop: document.querySelector('#emergencyStop'),
   clearEmergency: document.querySelector('#clearEmergency'),
   exportJournal: document.querySelector('#exportJournal'),
@@ -41,14 +45,17 @@ const elements = {
   tvSignalState: document.querySelector('#tvSignalState'),
   tvRejectReason: document.querySelector('#tvRejectReason'),
   decisionState: document.querySelector('#decisionState'),
+  webhookPollState: document.querySelector('#webhookPollState'),
   eventLog: document.querySelector('#eventLog')
 };
 
 let scanner = createInitialScannerState();
 let timer = null;
+let signalPollTimer = null;
 let scanSequence = 0;
 let latestSignalResult = null;
 let latestDecision = null;
+let latestWebhookPoll = 'Not polled';
 let duplicateDemoId = null;
 const seenSignals = new Map();
 const journal = [];
@@ -112,6 +119,12 @@ function scheduleLoop() {
   timer = setInterval(() => tick(false), scanner.scanIntervalMs);
 }
 
+function startSignalPolling() {
+  clearInterval(signalPollTimer);
+  pollLatestTradingViewSignal(false);
+  signalPollTimer = setInterval(() => pollLatestTradingViewSignal(false), POLL_INTERVAL_MS);
+}
+
 function log(message) {
   const item = `${new Date().toLocaleTimeString()} — ${message}`;
   journal.unshift(item);
@@ -142,6 +155,32 @@ function injectDemoSignal(useDuplicate = false) {
   render();
 }
 
+async function pollLatestTradingViewSignal(manual = false) {
+  try {
+    const response = await fetch(TRADINGVIEW_LATEST_ENDPOINT, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    latestWebhookPoll = payload.live ? `Latest persisted signal at ${new Date().toLocaleTimeString()}` : 'No persisted signal yet';
+
+    if (payload.signal) {
+      latestSignalResult = {
+        state: payload.signal.state,
+        accepted: payload.signal.accepted,
+        reason: payload.signal.reason,
+        signal: payload.signal.signal
+      };
+      evaluateLatestDecision(simulatedAssessment());
+      if (manual) log(`Polled latest TradingView signal: ${latestSignalResult.state}.`);
+    } else if (manual) {
+      log('Polled TradingView latest endpoint: no signal persisted yet.');
+    }
+  } catch (error) {
+    latestWebhookPoll = `Webhook polling unavailable: ${error.message}`;
+    if (manual) log(`TradingView latest polling failed: ${error.message}`);
+  }
+  render();
+}
+
 function evaluateLatestDecision(assessment = simulatedAssessment()) {
   if (!latestSignalResult) return;
   const candidate = scanner.candidates.find((item) => item.ticker === latestSignalResult.signal?.symbol) ?? scanner.candidates[0];
@@ -169,7 +208,7 @@ function openDemoPosition() {
     riskPercent: 1,
     thesis: 'Simulated lifecycle demo: VWAP/RVOL candidate requires real feed before eligibility.',
     evidenceFor: [`VWAP slope ${candidate.vwapSlope}`, `RVOL-20 ${formatMultiple(candidate.rvol20)}`],
-    evidenceAgainst: ['Feed state is SIMULATED', 'TradingView webhook not connected'],
+    evidenceAgainst: ['Feed state is SIMULATED', 'TradingView webhook awaiting deployment'],
     setup: 'SIMULATED_VWAP_RVOL_DEMO',
     marketRegime: 'SIMULATED'
   });
@@ -216,12 +255,13 @@ function render() {
 }
 
 function renderSignalState() {
-  elements.tvStatus.textContent = latestSignalResult ? 'Signal received' : 'Not connected';
+  elements.tvStatus.textContent = latestSignalResult ? 'Signal received' : 'Polling latest';
   elements.tvStatus.className = latestSignalResult?.accepted ? 'pill success' : latestSignalResult ? 'pill danger' : 'pill muted';
   elements.tvLatestSignal.textContent = latestSignalResult?.signal ? `${latestSignalResult.signal.symbol} ${latestSignalResult.signal.action} ${formatMoney(latestSignalResult.signal.price)}` : '—';
   elements.tvSignalState.textContent = latestSignalResult?.state ?? '—';
   elements.tvRejectReason.textContent = latestSignalResult?.reason ?? latestDecision?.reason ?? '—';
   elements.decisionState.textContent = latestDecision ? `${latestDecision.state}${latestDecision.reason ? ` / ${latestDecision.reason}` : ''}` : '—';
+  elements.webhookPollState.textContent = latestWebhookPoll;
 }
 
 function renderCandidates() {
@@ -297,6 +337,7 @@ elements.evaluatePositions.addEventListener('click', () => {
 });
 elements.injectTvSignal.addEventListener('click', () => injectDemoSignal(false));
 elements.injectDuplicateSignal.addEventListener('click', () => injectDemoSignal(true));
+elements.pollLatestSignal.addEventListener('click', () => pollLatestTradingViewSignal(true));
 
 elements.emergencyStop.addEventListener('click', () => {
   clearInterval(timer);
@@ -327,4 +368,5 @@ elements.exportJournal.addEventListener('click', () => {
 
 log('AlphaGate shell loaded. Feed is SIMULATED and not tradeable.');
 render();
+startSignalPolling();
 setInterval(render, 1000);
