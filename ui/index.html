@@ -26,6 +26,8 @@
         <button id="startScanner" type="button">Start Scanner</button>
         <button id="stopScanner" type="button">Stop Scanner</button>
         <button id="refreshNow" type="button">Refresh Now</button>
+        <button id="openPaperDemo" type="button">Open Paper Demo</button>
+        <button id="evaluatePositions" type="button">Evaluate Positions</button>
         <button id="clearEmergency" type="button">Clear Emergency</button>
         <button id="emergencyStop" class="danger-button" type="button">Emergency Stop</button>
       </section>
@@ -50,6 +52,7 @@
             <div><dt>Risk / Trade</dt><dd>1%</dd></div>
             <div><dt>Daily Stop</dt><dd>2%</dd></div>
             <div><dt>Open Positions</dt><dd id="openPositions">0</dd></div>
+            <div><dt>Unrealized P&L</dt><dd id="unrealizedPnl">A$0.00</dd></div>
           </dl>
         </article>
       </section>
@@ -59,9 +62,23 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Ticker</th><th>Action</th><th>Price</th><th>VWAP</th><th>RVOL</th><th>Score</th><th>Decision</th></tr>
+              <tr>
+                <th>Ticker</th><th>Action</th><th>Price</th><th>VWAP</th><th>VWAP Dist</th><th>VWAP Slope</th><th>RVOL-20</th><th>TOD RVOL</th><th>Score</th><th>Decision</th>
+              </tr>
             </thead>
             <tbody id="candidateRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><h2>Active Paper Positions</h2><span class="pill warning">SIMULATED ONLY</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Ticker</th><th>State</th><th>Direction</th><th>Entry</th><th>Stop</th><th>Target</th><th>Qty</th><th>R</th><th>Exit</th></tr>
+            </thead>
+            <tbody id="positionRows"></tbody>
           </table>
         </div>
       </section>
