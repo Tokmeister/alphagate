@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07111d" />
+    <title>AlphaGate Trading Command</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Taranex Intelligence / AlphaGate</p>
+          <h1>Trading Command</h1>
+          <p>Autonomous scanner scaffold. Paper mode only. Simulated feed clearly labelled until a verified provider is connected.</p>
+        </div>
+        <div class="mode-stack">
+          <span class="pill warning">PAPER MODE</span>
+          <span class="pill danger">IBKR LIVE DISABLED</span>
+          <span class="pill" id="feedPill">SIMULATED FEED</span>
+        </div>
+      </header>
+
+      <section class="control-bar" aria-label="Scanner controls">
+        <button id="startScanner" type="button">Start Scanner</button>
+        <button id="stopScanner" type="button">Stop Scanner</button>
+        <button id="refreshNow" type="button">Refresh Now</button>
+        <button id="clearEmergency" type="button">Clear Emergency</button>
+        <button id="emergencyStop" class="danger-button" type="button">Emergency Stop</button>
+      </section>
+
+      <section class="grid status-grid" aria-label="Engine status">
+        <article class="card"><span>Scanner</span><strong id="scannerState">IDLE</strong><small id="scannerReason">Waiting</small></article>
+        <article class="card"><span>Market Data</span><strong id="feedState">SIMULATED</strong><small id="feedReason">Not tradeable</small></article>
+        <article class="card"><span>Last Scan</span><strong id="lastScan">—</strong><small>Updates when scanner runs</small></article>
+        <article class="card"><span>Next Scan</span><strong id="nextScan">—</strong><small id="countdown">Stopped</small></article>
+      </section>
+
+      <section class="grid main-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading"><h2>TradingView Panel</h2><span class="pill muted">Placeholder</span></div>
+          <div class="chart-placeholder">TradingView chart embed will mount here after provider configuration.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading"><h2>Paper Account</h2><span class="pill warning">LIVE ORDERS OFF</span></div>
+          <dl class="metrics">
+            <div><dt>Equity</dt><dd>A$10,000</dd></div>
+            <div><dt>Risk / Trade</dt><dd>1%</dd></div>
+            <div><dt>Daily Stop</dt><dd>2%</dd></div>
+            <div><dt>Open Positions</dt><dd id="openPositions">0</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><h2>Top Opportunities</h2><span id="tradingStatus" class="pill danger">TRADING BLOCKED</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Ticker</th><th>Action</th><th>Price</th><th>VWAP</th><th>RVOL</th><th>Score</th><th>Decision</th></tr>
+            </thead>
+            <tbody id="candidateRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-heading"><h2>Event Log</h2><button id="exportJournal" type="button">Export Journal</button></div>
+        <ol id="eventLog"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
