@@ -9,6 +9,8 @@ import {
 } from '../src/scanner-runtime.js';
 import { enrichCandidateWithVwapRvol } from '../src/vwap-rvol.js';
 import { evaluatePaperPosition, openPaperPosition } from '../src/paper-position.js';
+import { ingestTradingViewSignal } from '../src/tradingview-signal.js';
+import { evaluateDecisionGate } from '../src/decision-gate.js';
 
 const elements = {
   startScanner: document.querySelector('#startScanner'),
@@ -16,6 +18,8 @@ const elements = {
   refreshNow: document.querySelector('#refreshNow'),
   openPaperDemo: document.querySelector('#openPaperDemo'),
   evaluatePositions: document.querySelector('#evaluatePositions'),
+  injectTvSignal: document.querySelector('#injectTvSignal'),
+  injectDuplicateSignal: document.querySelector('#injectDuplicateSignal'),
   emergencyStop: document.querySelector('#emergencyStop'),
   clearEmergency: document.querySelector('#clearEmergency'),
   exportJournal: document.querySelector('#exportJournal'),
@@ -32,12 +36,21 @@ const elements = {
   positionRows: document.querySelector('#positionRows'),
   openPositions: document.querySelector('#openPositions'),
   unrealizedPnl: document.querySelector('#unrealizedPnl'),
+  tvStatus: document.querySelector('#tvStatus'),
+  tvLatestSignal: document.querySelector('#tvLatestSignal'),
+  tvSignalState: document.querySelector('#tvSignalState'),
+  tvRejectReason: document.querySelector('#tvRejectReason'),
+  decisionState: document.querySelector('#decisionState'),
   eventLog: document.querySelector('#eventLog')
 };
 
 let scanner = createInitialScannerState();
 let timer = null;
 let scanSequence = 0;
+let latestSignalResult = null;
+let latestDecision = null;
+let duplicateDemoId = null;
+const seenSignals = new Map();
 const journal = [];
 const paperPositions = [];
 
@@ -88,6 +101,7 @@ function tick(manual = false) {
   const assessment = simulatedAssessment(now);
   const candidates = buildCandidates();
   scanner = runScan(scanner, assessment, candidates, now);
+  if (latestSignalResult) evaluateLatestDecision(assessment);
   evaluateOpenPositions(false);
   log(manual ? 'Manual refresh completed with simulated VWAP/RVOL scan.' : 'Automatic scan completed with simulated VWAP/RVOL scan.');
   render();
@@ -104,9 +118,44 @@ function log(message) {
   if (journal.length > 30) journal.pop();
 }
 
+function injectDemoSignal(useDuplicate = false) {
+  const now = Date.now();
+  const candidate = scanner.candidates[0] ?? buildCandidates()[0];
+  if (!duplicateDemoId || !useDuplicate) duplicateDemoId = `demo-${candidate.ticker}-${now}`;
+
+  latestSignalResult = ingestTradingViewSignal({
+    id: duplicateDemoId,
+    source: 'TradingView',
+    symbol: candidate.ticker,
+    action: 'LONG',
+    price: candidate.price,
+    timeframe: '5m',
+    receivedAt: new Date(now).toISOString()
+  }, {
+    now,
+    seenSignals,
+    duplicateTtlMs: 120_000
+  });
+
+  evaluateLatestDecision(simulatedAssessment(now));
+  log(`${useDuplicate ? 'Duplicate' : 'Demo'} TradingView signal ${latestSignalResult.state}: ${latestSignalResult.reason ?? latestSignalResult.signal.symbol}`);
+  render();
+}
+
+function evaluateLatestDecision(assessment = simulatedAssessment()) {
+  if (!latestSignalResult) return;
+  const candidate = scanner.candidates.find((item) => item.ticker === latestSignalResult.signal?.symbol) ?? scanner.candidates[0];
+  latestDecision = evaluateDecisionGate({
+    signalResult: latestSignalResult,
+    marketDataAssessment: assessment,
+    candidate,
+    riskApproval: { allowed: true }
+  });
+}
+
 function openDemoPosition() {
   if (scanner.tradingBlocked) {
-    log('Paper demo blocked: feed is simulated and not paper-trade eligible. Opening controlled demo position for lifecycle visibility only.');
+    log('Paper demo blocked for real eligibility: feed is simulated. Opening controlled demo position for lifecycle visibility only.');
   }
 
   const candidate = scanner.candidates[0] ?? buildCandidates()[0];
@@ -160,6 +209,22 @@ function render() {
   const seconds = scanner.nextScanAt ? Math.max(0, Math.ceil((Date.parse(scanner.nextScanAt) - Date.now()) / 1000)) : null;
   elements.countdown.textContent = seconds === null ? 'Stopped' : `${seconds}s until next scan`;
 
+  renderSignalState();
+  renderCandidates();
+  renderPositions();
+  elements.eventLog.innerHTML = journal.map((entry) => `<li>${entry}</li>`).join('');
+}
+
+function renderSignalState() {
+  elements.tvStatus.textContent = latestSignalResult ? 'Signal received' : 'Not connected';
+  elements.tvStatus.className = latestSignalResult?.accepted ? 'pill success' : latestSignalResult ? 'pill danger' : 'pill muted';
+  elements.tvLatestSignal.textContent = latestSignalResult?.signal ? `${latestSignalResult.signal.symbol} ${latestSignalResult.signal.action} ${formatMoney(latestSignalResult.signal.price)}` : '—';
+  elements.tvSignalState.textContent = latestSignalResult?.state ?? '—';
+  elements.tvRejectReason.textContent = latestSignalResult?.reason ?? latestDecision?.reason ?? '—';
+  elements.decisionState.textContent = latestDecision ? `${latestDecision.state}${latestDecision.reason ? ` / ${latestDecision.reason}` : ''}` : '—';
+}
+
+function renderCandidates() {
   elements.candidateRows.innerHTML = scanner.candidates.map((candidate) => `
     <tr>
       <td>${candidate.ticker}</td>
@@ -174,7 +239,9 @@ function render() {
       <td>${candidate.decision}</td>
     </tr>
   `).join('');
+}
 
+function renderPositions() {
   const active = paperPositions.filter((position) => position.state !== 'CLOSED');
   const unrealized = active.reduce((sum, position) => sum + position.unrealizedPnl, 0);
   elements.openPositions.textContent = active.length;
@@ -193,8 +260,6 @@ function render() {
       <td>${position.exit?.reason ?? '—'}</td>
     </tr>
   `).join('');
-
-  elements.eventLog.innerHTML = journal.map((entry) => `<li>${entry}</li>`).join('');
 }
 
 function formatMoney(value) {
@@ -230,6 +295,8 @@ elements.evaluatePositions.addEventListener('click', () => {
   evaluateOpenPositions(true);
   render();
 });
+elements.injectTvSignal.addEventListener('click', () => injectDemoSignal(false));
+elements.injectDuplicateSignal.addEventListener('click', () => injectDemoSignal(true));
 
 elements.emergencyStop.addEventListener('click', () => {
   clearInterval(timer);
